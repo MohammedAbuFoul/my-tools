@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TaskFlow — Code TODO Scanner & To-Do App</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-logo">TF</div>
+        <div>
+          <div class="brand-name">TaskFlow</div>
+          <div class="brand-sub">Code TODO Tracker</div>
+        </div>
+      </div>
+
+      <nav class="nav-section">
+        <div class="nav-label">Workspace</div>
+        <button class="nav-item active" data-view="all">
+          <span class="nav-icon">&#9776;</span>
+          <span class="nav-text">All Tasks</span>
+          <span class="nav-badge" id="count-all">0</span>
+        </button>
+        <button class="nav-item" data-view="todo">
+          <span class="nav-icon">&#9711;</span>
+          <span class="nav-text">To Do</span>
+          <span class="nav-badge" id="count-todo">0</span>
+        </button>
+        <button class="nav-item" data-view="in_progress">
+          <span class="nav-icon">&#9684;</span>
+          <span class="nav-text">In Progress</span>
+          <span class="nav-badge" id="count-in_progress">0</span>
+        </button>
+        <button class="nav-item" data-view="done">
+          <span class="nav-icon">&#10003;</span>
+          <span class="nav-text">Completed</span>
+          <span class="nav-badge" id="count-done">0</span>
+        </button>
+        <button class="nav-item" data-view="high">
+          <span class="nav-icon">&#9889;</span>
+          <span class="nav-text">High Priority</span>
+          <span class="nav-badge" id="count-high">0</span>
+        </button>
+        <button class="nav-item" data-view="scanned">
+          <span class="nav-icon">&lt;/&gt;</span>
+          <span class="nav-text">From Code</span>
+          <span class="nav-badge" id="count-scanned">0</span>
+        </button>
+      </nav>
+
+      <nav class="nav-section">
+        <div class="nav-label">Tools</div>
+        <button class="nav-item nav-scanner" data-view="scanner">
+          <span class="nav-icon">&#128269;</span>
+          <span class="nav-text">Code TODO Scanner</span>
+        </button>
+      </nav>
+
+      <nav class="nav-section categories-section">
+        <div class="nav-label">Categories</div>
+        <div id="category-list" class="category-list"></div>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="progress-header">
+          <span>Completion</span>
+          <span id="progress-percent">0%</span>
+        </div>
+        <div class="progress-track">
+          <div class="progress-bar" id="progress-bar" style="width: 0%"></div>
+        </div>
+        <div class="db-path" id="db-path-label" title="SQLite database path">SQLite ready</div>
+      </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <header class="topbar">
+        <div class="topbar-left">
+          <h1 id="view-title">All Tasks</h1>
+          <span class="view-subtitle" id="view-subtitle"></span>
+        </div>
+        <div class="topbar-actions">
+          <div class="search-box" id="search-box-wrap">
+            <span class="search-icon">&#128269;</span>
+            <input type="text" id="search-input" placeholder="Search tasks, TASK (001), files... (/)" />
+          </div>
+          <select id="priority-filter" class="select-input" title="Filter by priority">
+            <option value="">All Priorities</option>
+            <option value="urgent">Urgent</option>
+            <option value="high">High</option>
+            <option value="medium">Medium</option>
+            <option value="low">Low</option>
+          </select>
+          <select id="sort-select" class="select-input" title="Sort tasks">
+            <option value="smart">Sort: Smart</option>
+            <option value="newest">Sort: Newest</option>
+            <option value="code">Sort: Task #</option>
+            <option value="due">Sort: Due Date</option>
+            <option value="priority">Sort: Priority</option>
+          </select>
+          <button class="btn btn-secondary btn-icon" id="theme-toggle" title="Toggle Light/Dark Theme">&#9788;</button>
+          <button class="btn btn-primary" id="new-task-btn">+ New Task</button>
+        </div>
+      </header>
+
+      <!-- Tasks View -->
+      <section id="tasks-view" class="view-panel">
+        <!-- Quick Add Bar -->
+        <form id="quick-add-form" class="quick-add-bar">
+          <input type="text" id="quick-title" placeholder="Quick add a task and press Enter..." autocomplete="off" />
+          <select id="quick-priority" class="select-input compact">
+            <option value="low">Low</option>
+            <option value="medium" selected>Medium</option>
+            <option value="high">High</option>
+            <option value="urgent">Urgent</option>
+          </select>
+          <input type="text" id="quick-category" class="text-input compact" placeholder="Category" value="General" />
+          <input type="date" id="quick-due" class="text-input compact" title="Due date" />
+          <button type="submit" class="btn btn-primary">Add</button>
+        </form>
+
+        <div class="tasks-toolbar" id="completed-toolbar" style="display: none;">
+          <span class="muted-text">Showing completed tasks</span>
+          <button class="btn btn-danger-outline btn-sm" id="clear-completed-btn">Clear All Completed</button>
+        </div>
+
+        <div id="task-list" class="task-list"></div>
+      </section>
+
+      <!-- Scanner View -->
+      <section id="scanner-view" class="view-panel" style="display: none;">
+        <div class="scanner-card">
+          <div class="scanner-header">
+            <div>
+              <h2>Codebase TODO Scanner</h2>
+              <p class="muted-text">
+                Recursively scans source files for <code>TODO</code>, replaces each match with a sequential
+                <code>TASK (XXX)</code> identifier, and saves it directly into your SQLite to-do list.
+              </p>
+            </div>
+          </div>
+
+          <div class="scanner-form">
+            <div class="form-row">
+              <label for="scan-dir">Target Directory</label>
+              <div class="input-group">
+                <input type="text" id="scan-dir" class="text-input" placeholder="C:\path\to\your\project" />
+                <button type="button" class="btn btn-secondary" id="browse-dir-btn">Browse Folder...</button>
+              </div>
+            </div>
+
+            <div class="form-grid-3">
+              <div class="form-row">
+                <label for="scan-category">Task Category (optional)</label>
+                <input type="text" id="scan-category" class="text-input" placeholder="Defaults to folder name" />
+              </div>
+              <div class="form-row">
+                <label for="scan-priority">Default Priority</label>
+                <select id="scan-priority" class="select-input">
+                  <option value="low">Low</option>
+                  <option value="medium" selected>Medium</option>
+                  <option value="high">High</option>
+                  <option value="urgent">Urgent</option>
+                </select>
+              </div>
+              <div class="form-row">
+                <label for="scan-extensions">Extensions (optional)</label>
+                <input type="text" id="scan-extensions" class="text-input" placeholder=".go, .py, .ts (or * for all)" />
+              </div>
+            </div>
+
+            <div class="form-row">
+              <label for="scan-ignore">Extra Ignored Directories (optional)</label>
+              <input type="text" id="scan-ignore" class="text-input" placeholder="e.g. generated, tmp, mocks (.git, node_modules, vendor are always skipped)" />
+            </div>
+
+            <div class="scanner-actions">
+              <button type="button" class="btn btn-secondary" id="preview-scan-btn">Preview Scan (Dry Run)</button>
+              <button type="button" class="btn btn-primary" id="apply-scan-btn">Scan &amp; Replace TODOs</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Scan Results -->
+        <div id="scan-results-card" class="scanner-card" style="display: none;">
+          <div class="scan-summary" id="scan-summary"></div>
+          <div id="scan-errors" class="scan-errors" style="display: none;"></div>
+          <div class="matches-table-wrap">
+            <table class="matches-table">
+              <thead>
+                <tr>
+                  <th>Task Code</th>
+                  <th>File &amp; Line</th>
+                  <th>Before &rarr; After</th>
+                </tr>
+              </thead>
+              <tbody id="scan-matches-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Scan History -->
+        <div class="scanner-card">
+          <h3>Recent Scans</h3>
+          <div id="scan-history-list" class="history-list"></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Task Modal (Create / Edit / Subtasks) -->
+  <div class="modal-backdrop" id="task-modal" style="display: none;">
+    <div class="modal">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <span class="task-code-pill" id="modal-task-code" style="display: none;">TASK (001)</span>
+          <h2 id="modal-heading">New Task</h2>
+        </div>
+        <button class="btn-close" id="modal-close-btn">&times;</button>
+      </div>
+
+      <form id="task-form" class="modal-body">
+        <input type="hidden" id="modal-task-id" />
+
+        <div class="form-row">
+          <label for="modal-title">Title *</label>
+          <input type="text" id="modal-title" class="text-input" required placeholder="What needs to be done?" />
+        </div>
+
+        <div class="form-row">
+          <label for="modal-description">Description / Notes</label>
+          <textarea id="modal-description" class="text-input textarea" rows="3" placeholder="Add details, context, or implementation notes..."></textarea>
+        </div>
+
+        <div class="form-grid-2">
+          <div class="form-row">
+            <label for="modal-status">Status</label>
+            <select id="modal-status" class="select-input">
+              <option value="todo">To Do</option>
+              <option value="in_progress">In Progress</option>
+              <option value="done">Completed</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <label for="modal-priority">Priority</label>
+            <select id="modal-priority" class="select-input">
+              <option value="low">Low</option>
+              <option value="medium" selected>Medium</option>
+              <option value="high">High</option>
+              <option value="urgent">Urgent</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-grid-2">
+          <div class="form-row">
+            <label for="modal-category">Category</label>
+            <input type="text" id="modal-category" class="text-input" value="General" />
+          </div>
+          <div class="form-row">
+            <label for="modal-due">Due Date</label>
+            <input type="date" id="modal-due" class="text-input" />
+          </div>
+        </div>
+
+        <!-- Source Code Box (shown for scanned tasks) -->
+        <div id="modal-source-box" class="source-box" style="display: none;">
+          <div class="source-box-label">Source Code Reference</div>
+          <div class="source-box-path" id="modal-source-path"></div>
+          <pre class="source-box-snippet" id="modal-source-snippet"></pre>
+        </div>
+
+        <!-- Subtasks Section (shown when editing existing task) -->
+        <div id="modal-subtasks-section" class="subtasks-section" style="display: none;">
+          <div class="subtasks-header">Checklist / Subtasks</div>
+          <div id="modal-subtasks-list" class="subtasks-list"></div>
+          <div class="subtask-add-row">
+            <input type="text" id="new-subtask-input" class="text-input" placeholder="Add a subtask..." />
+            <button type="button" class="btn btn-secondary" id="add-subtask-btn">Add</button>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn btn-danger-outline" id="modal-delete-btn" style="display: none;">Delete Task</button>
+          <div class="modal-footer-right">
+            <button type="button" class="btn btn-secondary" id="modal-cancel-btn">Cancel</button>
+            <button type="submit" class="btn btn-primary" id="modal-save-btn">Save Task</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <script src="./app.js"></script>
+</body>
+</html>
